@@ -12,7 +12,7 @@ async fn main() {
         -hscr_w > pos.x || pos.x > hscr_w ||
         -hscr_h > pos.y || pos.y > hscr_h
     };
-    let mut frames = 0;
+    let mut frames = 1;
     let mut game_over = false;
 
     //colors:
@@ -45,6 +45,7 @@ async fn main() {
 
     //Enemy info:
     let mut enemy_pos = Vec2::new(45.0, 100.0);
+    let mut enemy_scale = 150.0;
     let mut proj: Vec<(Vec2, Vec2, f32)> = Vec::new();
 
     loop {
@@ -56,7 +57,7 @@ async fn main() {
         let n_plat_pos = Vec2::lerp(lerp_plat_pos_p0, lerp_plat_pos_p1, s);
         let d_plat_pos = n_plat_pos - plat_pos;
         plat_pos = n_plat_pos;
-        if s == 1.0 && frames % 20 == 0 {
+        if s == 1.0 && frames % 500 == 0 {
             lerp_plat_pos_p1 = Vec2::new(RandomRange::gen_range(-hscr_w + plat_hsize.x, hscr_w - plat_hsize.x), RandomRange::gen_range(-hscr_h + plat_hsize.y, hscr_h - plat_hsize.y));
             lerp_plat_pos_p0 = plat_pos;
             lerp_plat_pos_t0 = get_time();
@@ -90,7 +91,7 @@ async fn main() {
             p_c_col_1.a -= 1.0 * get_frame_time();
             p_c_col_2.a -= 1.0 * get_frame_time();
             p_size = f32::max(p_size - 4.0 * get_frame_time(), 0.0);
-            if frames % 20 == 0 {p_health = (p_health - 1).max(0)};
+            if frames % 50 == 0 {p_health = (p_health - 1).max(0)};
         }
         if p_health == 0 {
             game_over = true;
@@ -98,9 +99,10 @@ async fn main() {
 
         //update enemy:
         let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
-        enemy_pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (enemy_pos - plat_pos)) + plat_pos;
+        //let enemy_theta = 50.0 * get_frame_time();
+        enemy_pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (enemy_pos - plat_pos).normalize()) * enemy_scale + plat_pos;
         if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
-            proj.push((enemy_pos, -(enemy_pos - p_pos).normalize(), 10.0));
+            proj.push((enemy_pos, -(enemy_pos - p_pos).normalize(), 200.0));
         }
         //update proj:
         for (i, p) in proj.iter_mut().enumerate() {
