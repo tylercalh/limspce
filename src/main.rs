@@ -44,9 +44,15 @@ async fn main() {
     let mut lerp_plat_size_t0 = 0.0;
 
     //Enemy info:
-    let mut enemy_pos = Vec2::new(45.0, 100.0);
-    let mut enemy_scale = 150.0;
-    let mut proj: Vec<(Vec2, Vec2, f32)> = Vec::new();
+    //let mut enemy_pos = Vec2::new(45.0, 100.0);
+    //let mut enemy_scale = 150.0;
+    //let mut proj: Vec<(Vec2, Vec2, f32)> = Vec::new();
+    let mut enemies: Vec<Enemy> = Vec::new();
+    let mut e = Enemy {
+        pos: Vec2::new(45.0, 100.0),
+        scale: 150.0,
+        proj: Vec::new(),
+    };
 
     loop {
         clear_background(bg_col);
@@ -98,41 +104,74 @@ async fn main() {
         }
 
         //update enemy:
-        let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
+        //let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
         //let enemy_theta = 50.0 * get_frame_time();
-        enemy_pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (enemy_pos - plat_pos).normalize()) * enemy_scale + plat_pos;
-        if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
-            proj.push((enemy_pos, -(enemy_pos - p_pos).normalize(), 200.0));
+        //enemy_pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (enemy_pos - plat_pos).normalize()) * enemy_scale + plat_pos;
+        //if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
+        //    proj.push((enemy_pos, -(enemy_pos - p_pos).normalize(), 200.0));
+        //}
+
+        for e in enemies.iter_mut() {
+            let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
+            e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - plat_pos).normalize()) * e.scale + plat_pos;
+
+            if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
+              e.proj.push((e.pos, -(e.pos - p_pos).normalize(), 200.0));
+            }
+            for (i, p) in e.proj.iter_mut().enumerate() {
+                p.2 = p.2 + 4.0;
+                p.0 = p.0 + (p.1 * p.2 * get_frame_time());
+            }
+            e.proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
         }
+
         //update proj:
-        for (i, p) in proj.iter_mut().enumerate() {
-            p.2 = p.2 + 4.0;
-            p.0 = p.0 + (p.1 * p.2 * get_frame_time());
-        }
-        proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
+        //for (i, p) in proj.iter_mut().enumerate() {
+        //    p.2 = p.2 + 4.0;
+        //    p.0 = p.0 + (p.1 * p.2 * get_frame_time());
+        //}
+        //proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
 
         //Player proj collision:
-        let mut rem_proj: Option<usize> = None;
-        for (i, p) in proj.iter().enumerate() {
-            if circle_overlap(p_pos, p_size, p.0, 3.0) {
-                rem_proj = Some(i);
-                p_health -= 1;
+        for e in enemies.iter_mut() {
+            let mut rem_proj: Option<usize> = None;
+            for (i, p) in e.proj.iter_mut().enumerate() {
+                if circle_overlap(p_pos, p_size, p.0, 3.0) {
+                    rem_proj = Some(i);
+                    p_health -= 1;
+                }
+            }
+            if let Some(i) = rem_proj {
+                e.proj.swap_remove(i);
             }
         }
-        if let Some(i) = rem_proj {
-            proj.swap_remove(i);
-        }
+        //let mut rem_proj: Option<usize> = None;
+        //for (i, p) in proj.iter().enumerate() {
+        //    if circle_overlap(p_pos, p_size, p.0, 3.0) {
+        //        rem_proj = Some(i);
+        //        p_health -= 1;
+        //    }
+        //}
+        //if let Some(i) = rem_proj {
+        //    proj.swap_remove(i);
+        //}
 
         // Draw:
         draw_platform(pos_to_world(plat_pos), plat_hsize.x, plat_hsize.y, platform1_col, platform2_col);
         draw_cir(pos_to_world(p_pos), p_size, p_c_col_1, p_c_col_2);
 
-        for p in proj.iter() {
-            let pos = pos_to_world(p.0);
-            //draw_circle(pos.x, pos.y, 4.0, RED);
-            draw_cir(pos, 3.0, RED, ORANGE);
+        for e in enemies.iter() {
+            for p in e.proj.iter() {
+                draw_cir(pos_to_world(p.0), 3.0, RED, ORANGE);    
+            }
+            draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - p_pos, Vec2::Y),RED, WHITE);
         }
-        draw_enemy(pos_to_world(enemy_pos), Vec2::angle_between(enemy_pos - p_pos, Vec2::Y),RED, WHITE);
+        //for p in proj.iter() {
+        //    let pos = pos_to_world(p.0);
+        //    //draw_circle(pos.x, pos.y, 4.0, RED);
+        //    draw_cir(pos, 3.0, RED, ORANGE);
+        //}
+        //draw_enemy(pos_to_world(enemy_pos), Vec2::angle_between(enemy_pos - p_pos, Vec2::Y),RED, WHITE);
         for i in 0..p_health {
             //draw_circle(20.0 + (i as f32 * 20.0), 20.0, 10.0, ORANGE);
             draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 0.0), 10.0, GREEN, WHITE);
@@ -191,4 +230,9 @@ fn rot_mat(theta: f32) -> Mat2 {
 }
 fn circle_overlap(c1: Vec2, r1: f32, c2: Vec2, r2: f32) -> bool {
     Vec2::distance(c1, c2) < r1 + r2
+}
+struct Enemy {
+    pos: Vec2,
+    scale: f32,
+    proj: Vec<(Vec2, Vec2, f32)>,
 }
