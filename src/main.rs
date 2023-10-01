@@ -25,14 +25,20 @@ async fn main() {
     let grid_col = Color::from_hex(0x1e3821);
 
     //Player info:
-    let mut p_pos = Vec2::new(hscr_w, hscr_h);
-    p_pos = world_to_pos(p_pos);
-    let mut p_size = 7.0;
-    let p_speed = 150.0;
-    let p_z = 0.0;
+    // let mut p_pos = Vec2::new(hscr_w, hscr_h);
+    // p_pos = world_to_pos(p_pos);
+    // let mut p_size = 7.0;
+    // let p_speed = 150.0;
     let mut p_c_col_1 = p_col_1;
     let mut p_c_col_2 = p_col_2;
-    let mut p_health = 3;
+    //let mut p_health = 3;
+
+    let mut player = Player {
+        pos: Vec2::new(0.0, 0.0),
+        size: 7.0,
+        speed: 150.0,
+        health: 3,
+    };
 
     //Map info:
     let mut plat_pos = Vec2::new(hscr_w, hscr_h);
@@ -61,7 +67,7 @@ async fn main() {
         if !game_over {
             elapsed_time += get_frame_time();
         }
-        let p_on_plat = p_on_plat(p_pos, p_size, plat_pos, plat_hsize);
+        let p_on_plat = p_on_plat(player.pos, player.size, plat_pos, plat_hsize);
 
         //update platform
         let s = get_s(lerp_plat_pos_p0, lerp_plat_pos_p1, get_time(), lerp_plat_pos_t0, 20.0);
@@ -87,24 +93,24 @@ async fn main() {
         if p_on_plat && !game_over {
             let mut dx = 0.0;
             let mut dy = 0.0;
-            if is_key_down(KeyCode::A) {dx += 1.0 * p_speed * get_frame_time();}
-            if is_key_down(KeyCode::D) {dx += -1.0 * p_speed * get_frame_time();} 
-            if is_key_down(KeyCode::S) {dy += -1.0 * p_speed * get_frame_time();}
-            if is_key_down(KeyCode::W) {dy += 1.0 * p_speed * get_frame_time();}
-            p_pos += Vec2::new(dx, dy);
+            if is_key_down(KeyCode::A) {dx += 1.0 * player.speed * get_frame_time();}
+            if is_key_down(KeyCode::D) {dx += -1.0 * player.speed * get_frame_time();} 
+            if is_key_down(KeyCode::S) {dy += -1.0 * player.speed * get_frame_time();}
+            if is_key_down(KeyCode::W) {dy += 1.0 * player.speed * get_frame_time();}
+            player.pos += Vec2::new(dx, dy);
+            player.pos += d_plat_pos; //Parent player to platform
 
-            p_pos += d_plat_pos;
         } else if game_over {
             p_c_col_1.a = 0.0;
             p_c_col_2.a = 0.0;
         } else {
-            p_pos.y -= 120.0 * 1.0 * get_frame_time();
+            player.pos.y -= 120.0 * 1.0 * get_frame_time();
             p_c_col_1.a -= 1.0 * get_frame_time();
             p_c_col_2.a -= 1.0 * get_frame_time();
-            p_size = f32::max(p_size - 4.0 * get_frame_time(), 0.0);
-            if frames % 50 == 0 {p_health = (p_health - 1).max(0)};
+            player.size = f32::max(player.size - 4.0 * get_frame_time(), 0.0);
+            if frames % 50 == 0 {player.health = (player.health - 1).max(0)};
         }
-        if p_health == 0 {
+        if player.health == 0 {
             game_over = true;
         }
 
@@ -125,7 +131,7 @@ async fn main() {
             e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - plat_pos).normalize()) * e.scale + plat_pos;
 
             if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
-              e.proj.push((e.pos, -(e.pos - p_pos).normalize(), 20.0));
+              e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
             }
             for (i, p) in e.proj.iter_mut().enumerate() {
                 p.2 = p.2 + 4.0;
@@ -138,9 +144,9 @@ async fn main() {
         for e in enemies.iter_mut() {
             let mut rem_proj: Option<usize> = None;
             for (i, p) in e.proj.iter_mut().enumerate() {
-                if circle_overlap(p_pos, p_size, p.0, 3.0) {
+                if circle_overlap(player.pos, player.size, p.0, 3.0) {
                     rem_proj = Some(i);
-                    p_health -= 1;
+                    player.health -= 1;
                 }
             }
             if let Some(i) = rem_proj {
@@ -156,15 +162,15 @@ async fn main() {
             draw_line(i as f32*30.0, 0.0, i as f32*30.0, scr_h, 1.0, grid_col);
         }
         draw_platform(pos_to_world(plat_pos), plat_hsize.x, plat_hsize.y, platform1_col, platform2_col);
-        draw_cir(pos_to_world(p_pos), p_size, p_c_col_1, p_c_col_2);
+        draw_cir(pos_to_world(player.pos), player.size, p_c_col_1, p_c_col_2);
 
         for e in enemies.iter() {
             for p in e.proj.iter() {
                 draw_cir(pos_to_world(p.0), 3.0, MAROON, PINK);    
             }
-            draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - p_pos, Vec2::Y), ORANGE, GOLD);
+            draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - player.pos, Vec2::Y), ORANGE, GOLD);
         }
-        for i in 0..p_health {
+        for i in 0..player.health {
             //draw_circle(20.0 + (i as f32 * 20.0), 20.0, 10.0, ORANGE);
             draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 0.0), 10.0, GREEN, WHITE);
         }
@@ -226,6 +232,13 @@ fn rot_mat(theta: f32) -> Mat2 {
 }
 fn circle_overlap(c1: Vec2, r1: f32, c2: Vec2, r2: f32) -> bool {
     Vec2::distance(c1, c2) < r1 + r2
+}
+
+struct Player {
+    pos: Vec2,
+    size: f32,
+    speed: f32,
+    health: i32,
 }
 struct Enemy {
     pos: Vec2,
