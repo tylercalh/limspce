@@ -12,9 +12,11 @@ async fn main() {
         -hscr_w > pos.x || pos.x > hscr_w ||
         -hscr_h > pos.y || pos.y > hscr_h
     };
-    let mut frames = 1;
+    let mut frames = 0;
     let mut game_over = false;
     let mut elapsed_time = 0.0;
+    let mut state = GameState::Play;
+    let mut on_plat = true;
 
     //colors:
     let bg_col = Color::from_hex(0x141414);
@@ -56,94 +58,190 @@ async fn main() {
 
     loop {
         clear_background(bg_col);
-        if !game_over {
-            elapsed_time += get_frame_time();
-        }
-        let p_on_plat = p_on_plat(player.pos, player.size, platform.pos, platform.hsize);
+        //if !game_over {
+        //    elapsed_time += get_frame_time();
+        //}
+        //let p_on_plat = p_on_plat(player.pos, player.size, platform.pos, platform.hsize);
 
         //Update platform:
-        let s = platform.lerp_pos.s(get_time());
-        let n_plat_pos = Vec2::lerp(platform.lerp_pos.p0, platform.lerp_pos.p1, s);
-        let d_plat_pos = n_plat_pos - platform.pos;
-        platform.pos = n_plat_pos;
-        if s == 1.0 && frames % 500 == 0 {
-            platform.lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + platform.hsize.x, hscr_w - platform.hsize.x), RandomRange::gen_range(-hscr_h + platform.hsize.y, hscr_h - platform.hsize.y));
-            platform.lerp_pos.p0 = platform.pos;
-            platform.lerp_pos.t0 = get_time();
-        }
+        // let s = platform.lerp_pos.s(get_time());
+        // let n_plat_pos = Vec2::lerp(platform.lerp_pos.p0, platform.lerp_pos.p1, s);
+        // let d_plat_pos = n_plat_pos - platform.pos;
+        // platform.pos = n_plat_pos;
+        // if s == 1.0 && frames % 500 == 0 {
+        //     platform.lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + platform.hsize.x, hscr_w - platform.hsize.x), RandomRange::gen_range(-hscr_h + platform.hsize.y, hscr_h - platform.hsize.y));
+        //     platform.lerp_pos.p0 = platform.pos;
+        //     platform.lerp_pos.t0 = get_time();
+        // }
         
-        if frames % 1000 == 0 {
-            platform.lerp_size.p0 = platform.hsize;
-            platform.lerp_size.p1 = platform.hsize * 0.75;
-            platform.lerp_size.t0 = get_time();
-        }
-        let s = platform.lerp_size.s(get_time());
-        platform.hsize = Vec2::lerp(platform.lerp_size.p0, platform.lerp_size.p1, s);
+        // if frames % 1000 == 0 {
+        //     platform.lerp_size.p0 = platform.hsize;
+        //     platform.lerp_size.p1 = platform.hsize * 0.75;
+        //     platform.lerp_size.t0 = get_time();
+        // }
+        // let s = platform.lerp_size.s(get_time());
+        // platform.hsize = Vec2::lerp(platform.lerp_size.p0, platform.lerp_size.p1, s);
 
         //Update player:
-        if p_on_plat && !game_over {
-            let mut dx = 0.0;
-            let mut dy = 0.0;
-            if is_key_down(KeyCode::A) {dx += 1.0 * player.speed * get_frame_time();}
-            if is_key_down(KeyCode::D) {dx += -1.0 * player.speed * get_frame_time();} 
-            if is_key_down(KeyCode::S) {dy += -1.0 * player.speed * get_frame_time();}
-            if is_key_down(KeyCode::W) {dy += 1.0 * player.speed * get_frame_time();}
-            player.pos += Vec2::new(dx, dy);
-            player.pos += d_plat_pos; //Parent player to platform
+        match &state {
+            GameState::Play => {
+                elapsed_time += get_frame_time();
+                frames += 1;
+                on_plat = p_on_plat(player.pos, player.size, platform.pos, platform.hsize);
 
-        } else if game_over {
-            p_c_col_1.a = 0.0;
-            p_c_col_2.a = 0.0;
-        } else {
-            player.pos.y -= 120.0 * 1.0 * get_frame_time();
-            p_c_col_1.a -= 1.0 * get_frame_time();
-            p_c_col_2.a -= 1.0 * get_frame_time();
-            player.size = f32::max(player.size - 4.0 * get_frame_time(), 0.0);
-            if frames % 50 == 0 {player.health = (player.health - 1).max(0)};
+                //Platform
+                let s = platform.lerp_pos.s(get_time());
+                let n_plat_pos = Vec2::lerp(platform.lerp_pos.p0, platform.lerp_pos.p1, s);
+                let d_plat_pos = n_plat_pos - platform.pos;
+                platform.pos = n_plat_pos;
+                if s == 1.0 && frames % 500 == 0 {
+                    platform.lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + platform.hsize.x, hscr_w - platform.hsize.x), RandomRange::gen_range(-hscr_h + platform.hsize.y, hscr_h - platform.hsize.y));
+                    platform.lerp_pos.p0 = platform.pos;
+                    platform.lerp_pos.t0 = get_time();
+                }
+                
+                if frames % 1000 == 0 {
+                    platform.lerp_size.p0 = platform.hsize;
+                    platform.lerp_size.p1 = platform.hsize * 0.75;
+                    platform.lerp_size.t0 = get_time();
+                }
+                let s = platform.lerp_size.s(get_time());
+                platform.hsize = Vec2::lerp(platform.lerp_size.p0, platform.lerp_size.p1, s);
+
+                //Player:
+                let mut dx = 0.0;
+                let mut dy = 0.0;
+                if is_key_down(KeyCode::A) {dx += 1.0 * player.speed * get_frame_time();}
+                if is_key_down(KeyCode::D) {dx += -1.0 * player.speed * get_frame_time();} 
+                if is_key_down(KeyCode::S) {dy += -1.0 * player.speed * get_frame_time();}
+                if is_key_down(KeyCode::W) {dy += 1.0 * player.speed * get_frame_time();}
+                player.pos += Vec2::new(dx, dy);
+                player.pos += d_plat_pos; //Parent player to platform
+                if player.health < 0 {state = GameState::GameOver;}
+
+                //Player proj collision:
+                for e in enemies.iter_mut() {
+                    let mut rem_proj: Option<usize> = None;
+                    for (i, p) in e.proj.iter_mut().enumerate() {
+                        if circle_overlap(player.pos, player.size, p.0, 3.0) {
+                            rem_proj = Some(i);
+                            player.health -= 1;
+                        }
+                    }
+                    if let Some(i) = rem_proj {
+                        e.proj.swap_remove(i);
+                    }
+                }
+
+                // Enemies:
+                if frames % 1100 == 0 {
+                    let e = Enemy {
+                        pos: Vec2::new(RandomRange::gen_range(-1.0, 1.0), RandomRange::gen_range(-1.0, 1.0)),
+                        scale: RandomRange::gen_range(175.0, 300.0),
+                        proj: Vec::new(),
+                        rdm: RandomRange::gen_range(0.0, 100.0),
+                        rdmf: RandomRange::gen_range(1, 5),
+                    };
+                    enemies.push(e);
+                }
+                for e in enemies.iter_mut() {
+                    let time = get_time() + e.rdm as f64;
+                    let enemy_theta = time.sin()+ (time/2.0).cos();
+                    e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - platform.pos).normalize()) * e.scale + platform.pos;
+        
+                    if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
+                      e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
+                    }
+                    for p in e.proj.iter_mut() {
+                        p.2 = p.2 + 4.0;
+                        p.0 = p.0 + (p.1 * p.2 * get_frame_time());
+                    }
+                    e.proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
+                }          
+
+            },
+            GameState::Pause => {
+
+            },
+            GameState::GameOver => {
+                if !on_plat {
+                    player.pos.y -= 120.0 * 1.0 * get_frame_time();
+                    p_c_col_1.a -= 1.0 * get_frame_time();
+                    p_c_col_2.a -= 1.0 * get_frame_time();
+                    player.size = f32::max(player.size - 4.0 * get_frame_time(), 0.0);
+                    if frames % 50 == 0 {player.health = (player.health - 1).max(0)};
+                } else {
+                    p_c_col_1.a = 0.0;
+                    p_c_col_2.a = 0.0;        
+                }
+            },
+            GameState::MainMenu => {
+
+            }
         }
-        if player.health == 0 {
-            game_over = true;
-        }
+        // if p_on_plat && !game_over {
+        //     let mut dx = 0.0;
+        //     let mut dy = 0.0;
+        //     if is_key_down(KeyCode::A) {dx += 1.0 * player.speed * get_frame_time();}
+        //     if is_key_down(KeyCode::D) {dx += -1.0 * player.speed * get_frame_time();} 
+        //     if is_key_down(KeyCode::S) {dy += -1.0 * player.speed * get_frame_time();}
+        //     if is_key_down(KeyCode::W) {dy += 1.0 * player.speed * get_frame_time();}
+        //     player.pos += Vec2::new(dx, dy);
+        //     player.pos += d_plat_pos; //Parent player to platform
+
+        // } else if game_over {
+        //     p_c_col_1.a = 0.0;
+        //     p_c_col_2.a = 0.0;
+        // } else {
+        //     player.pos.y -= 120.0 * 1.0 * get_frame_time();
+        //     p_c_col_1.a -= 1.0 * get_frame_time();
+        //     p_c_col_2.a -= 1.0 * get_frame_time();
+        //     player.size = f32::max(player.size - 4.0 * get_frame_time(), 0.0);
+        //     if frames % 50 == 0 {player.health = (player.health - 1).max(0)};
+        // }
+        // if player.health == 0 {
+        //     game_over = true;
+        // }
 
         //Update enemy:
-        if frames % 1100 == 0 {
-            let e = Enemy {
-                pos: Vec2::new(RandomRange::gen_range(-1.0, 1.0), RandomRange::gen_range(-1.0, 1.0)),
-                scale: RandomRange::gen_range(175.0, 300.0),
-                proj: Vec::new(),
-                rdm: RandomRange::gen_range(0.0, 100.0),
-                rdmf: RandomRange::gen_range(1, 5),
-            };
-            enemies.push(e);
-        }
-        for e in enemies.iter_mut() {
-            let time = get_time() + e.rdm as f64;
-            let enemy_theta = time.sin()+ (time/2.0).cos();
-            e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - platform.pos).normalize()) * e.scale + platform.pos;
+        // if frames % 1100 == 0 {
+        //     let e = Enemy {
+        //         pos: Vec2::new(RandomRange::gen_range(-1.0, 1.0), RandomRange::gen_range(-1.0, 1.0)),
+        //         scale: RandomRange::gen_range(175.0, 300.0),
+        //         proj: Vec::new(),
+        //         rdm: RandomRange::gen_range(0.0, 100.0),
+        //         rdmf: RandomRange::gen_range(1, 5),
+        //     };
+        //     enemies.push(e);
+        // }
+        // for e in enemies.iter_mut() {
+        //     let time = get_time() + e.rdm as f64;
+        //     let enemy_theta = time.sin()+ (time/2.0).cos();
+        //     e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - platform.pos).normalize()) * e.scale + platform.pos;
 
-            if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
-              e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
-            }
-            for p in e.proj.iter_mut() {
-                p.2 = p.2 + 4.0;
-                p.0 = p.0 + (p.1 * p.2 * get_frame_time());
-            }
-            e.proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
-        }
+        //     if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
+        //       e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
+        //     }
+        //     for p in e.proj.iter_mut() {
+        //         p.2 = p.2 + 4.0;
+        //         p.0 = p.0 + (p.1 * p.2 * get_frame_time());
+        //     }
+        //     e.proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
+        // }
 
-        //Player proj collision:
-        for e in enemies.iter_mut() {
-            let mut rem_proj: Option<usize> = None;
-            for (i, p) in e.proj.iter_mut().enumerate() {
-                if circle_overlap(player.pos, player.size, p.0, 3.0) {
-                    rem_proj = Some(i);
-                    player.health -= 1;
-                }
-            }
-            if let Some(i) = rem_proj {
-                e.proj.swap_remove(i);
-            }
-        }
+        // //Player proj collision:
+        // for e in enemies.iter_mut() {
+        //     let mut rem_proj: Option<usize> = None;
+        //     for (i, p) in e.proj.iter_mut().enumerate() {
+        //         if circle_overlap(player.pos, player.size, p.0, 3.0) {
+        //             rem_proj = Some(i);
+        //             player.health -= 1;
+        //         }
+        //     }
+        //     if let Some(i) = rem_proj {
+        //         e.proj.swap_remove(i);
+        //     }
+        // }
 
         // Draw:
         for i in 0..(scr_h/30.0) as i32 +1 {
@@ -172,7 +270,7 @@ async fn main() {
             draw_text(format!("{:.2}", elapsed_time).as_str(), 5.0, screen_height()-10.0, 20.0, WHITE);
         }
 
-        frames += 1;
+        //frames += 1;
         next_frame().await
     }   
 }
@@ -222,6 +320,13 @@ struct Player {
     size: f32,
     speed: f32,
     health: i32,
+}
+
+enum GameState {
+    MainMenu,
+    Play,
+    Pause,
+    GameOver,
 }
 struct Enemy {
     pos: Vec2,
