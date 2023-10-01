@@ -6,7 +6,7 @@ async fn main() {
     let scr_h = screen_height();
     let hscr_w = scr_w/2.0;
     let hscr_h = scr_h/2.0;
-    let world_to_pos = |pos: Vec2| Vec2::new(scr_w-pos.x-hscr_w,scr_h-pos.y-hscr_h);
+    let _world_to_pos = |pos: Vec2| Vec2::new(scr_w-pos.x-hscr_w,scr_h-pos.y-hscr_h);
     let pos_to_world = |pos: Vec2| Vec2::new(scr_w-(hscr_w+pos.x), scr_h-(hscr_h+pos.y));
     let offscreen = |pos: Vec2| { 
         -hscr_w > pos.x || pos.x > hscr_w ||
@@ -35,25 +35,15 @@ async fn main() {
         health: 3,
     };
 
-    //Map:
-    let mut plat_pos = Vec2::new(hscr_w, hscr_h);
-    plat_pos = world_to_pos(plat_pos);
-    let mut plat_hsize = Vec2::new(200.0, 200.0);
-    
-    let mut lerp_pos = Lerp {
-        p0: plat_pos,
-        p1: Vec2::new(0.0, 70.0),
-        t0: 0.0,
-        speed: 20.0,
-    };
-    let mut lerp_size = Lerp {
-        p0: plat_hsize,
-        p1: plat_hsize,
-        t0: 0.0,
-        speed: 20.0,
+    // Platform:
+    let mut platform = Platform {
+        pos: Vec2::new(0.0, 0.0),
+        hsize: Vec2::new(200.0, 200.0),
+        lerp_pos: Lerp { p0: Vec2::new(0.0, 0.0), p1: Vec2::new(0.0, 70.0), t0: 0.0,speed: 20.0,}, 
+        lerp_size: Lerp { p0: Vec2::new(200.0, 200.0), p1: Vec2::new(200.0, 200.0), t0: 0.0, speed: 20.0,},
     };
 
-    //Enemy:
+    // Enemy:
     let mut enemies: Vec<Enemy> = Vec::new();
     let e = Enemy {
         pos: Vec2::new(45.0, 100.0),
@@ -69,26 +59,26 @@ async fn main() {
         if !game_over {
             elapsed_time += get_frame_time();
         }
-        let p_on_plat = p_on_plat(player.pos, player.size, plat_pos, plat_hsize);
+        let p_on_plat = p_on_plat(player.pos, player.size, platform.pos, platform.hsize);
 
         //Update platform:
-        let s = lerp_pos.s(get_time());
-        let n_plat_pos = Vec2::lerp(lerp_pos.p0, lerp_pos.p1, s);
-        let d_plat_pos = n_plat_pos - plat_pos;
-        plat_pos = n_plat_pos;
+        let s = platform.lerp_pos.s(get_time());
+        let n_plat_pos = Vec2::lerp(platform.lerp_pos.p0, platform.lerp_pos.p1, s);
+        let d_plat_pos = n_plat_pos - platform.pos;
+        platform.pos = n_plat_pos;
         if s == 1.0 && frames % 500 == 0 {
-            lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + plat_hsize.x, hscr_w - plat_hsize.x), RandomRange::gen_range(-hscr_h + plat_hsize.y, hscr_h - plat_hsize.y));
-            lerp_pos.p0 = plat_pos;
-            lerp_pos.t0 = get_time();
+            platform.lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + platform.hsize.x, hscr_w - platform.hsize.x), RandomRange::gen_range(-hscr_h + platform.hsize.y, hscr_h - platform.hsize.y));
+            platform.lerp_pos.p0 = platform.pos;
+            platform.lerp_pos.t0 = get_time();
         }
         
         if frames % 1000 == 0 {
-            lerp_size.p0 = plat_hsize;
-            lerp_size.p1 = plat_hsize * 0.75;
-            lerp_size.t0 = get_time();
+            platform.lerp_size.p0 = platform.hsize;
+            platform.lerp_size.p1 = platform.hsize * 0.75;
+            platform.lerp_size.t0 = get_time();
         }
-        let s = lerp_size.s(get_time());
-        plat_hsize = Vec2::lerp(lerp_size.p0, lerp_size.p1, s);
+        let s = platform.lerp_size.s(get_time());
+        platform.hsize = Vec2::lerp(platform.lerp_size.p0, platform.lerp_size.p1, s);
 
         //Update player:
         if p_on_plat && !game_over {
@@ -129,7 +119,7 @@ async fn main() {
         for e in enemies.iter_mut() {
             let time = get_time() + e.rdm as f64;
             let enemy_theta = time.sin()+ (time/2.0).cos();
-            e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - plat_pos).normalize()) * e.scale + plat_pos;
+            e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - platform.pos).normalize()) * e.scale + platform.pos;
 
             if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
               e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
@@ -162,7 +152,7 @@ async fn main() {
         for i in 0..(scr_w/30.0)  as i32 +1 {
             draw_line(i as f32*30.0, 0.0, i as f32*30.0, scr_h, 1.0, grid_col);
         } // Grid
-        draw_platform(pos_to_world(plat_pos), plat_hsize.x, plat_hsize.y, platform1_col, platform2_col);
+        draw_platform(pos_to_world(platform.pos), platform.hsize.x, platform.hsize.y, platform1_col, platform2_col);
         draw_cir(pos_to_world(player.pos), player.size, p_c_col_1, p_c_col_2);
 
         for e in enemies.iter() {
@@ -239,6 +229,13 @@ struct Enemy {
     proj: Vec<(Vec2, Vec2, f32)>,
     rdm: f32,
     rdmf: i32,
+}
+
+struct Platform {
+    pos: Vec2,
+    hsize: Vec2,
+    lerp_pos: Lerp, 
+    lerp_size: Lerp,
 }
 
 struct Lerp {
