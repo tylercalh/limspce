@@ -14,12 +14,12 @@ async fn main() {
             GameState::Play => {
                 Game::update(&mut g);
                 Game::draw(&g);
-                if is_key_pressed(KeyCode::Space) {g.state = GameState::Pause;}
+                if is_key_pressed(KeyCode::Escape) {g.state = GameState::Pause;}
                 g.elapsed_time += get_frame_time();
             },
             GameState::Pause => {
                 Game::draw(&g);
-                if is_key_pressed(KeyCode::Space) {g.state = GameState::Play;}
+                if is_key_pressed(KeyCode::Escape) {g.state = GameState::Play;}
             },
             GameState::GameOver => {
                 Game::update(&mut g);
@@ -46,6 +46,7 @@ async fn main() {
             GameState::MainMenu => {
                 draw_text("PRESS 'SPC' TO PLAY", 10.0, hscr_h, 92.0, WHITE);
                 if is_key_pressed(KeyCode::Space) {g.state = GameState::Play;}
+                if is_key_pressed(KeyCode::Escape) {break;}
             }
         }
         next_frame().await
@@ -97,6 +98,7 @@ struct Player {
     size: f32,
     speed: f32,
     health: i32,
+    blank: i32,
     col1: Color,
     col2: Color,
 }
@@ -146,6 +148,7 @@ struct Game {
     player: Player,
     platform: Platform,
     enemies: Vec<Enemy>,
+    blanks: Vec<(Vec2, Lerp, f32, Color)>,
 }
 
 impl Default for Game {
@@ -155,6 +158,7 @@ impl Default for Game {
             size: 7.0,
             speed: 150.0,
             health: 3,
+            blank: 3,
             col1: Color::from_hex(0x5990de),
             col2: Color::from_hex(0x93abcd),
         };
@@ -182,6 +186,7 @@ impl Default for Game {
             player: player,
             platform: platform,
             enemies: enemies,
+            blanks: Vec::new(),
         }
     }
 }
@@ -200,22 +205,22 @@ impl Game {
         g.on_plat = p_on_plat(g.player.pos, g.player.size, g.platform.pos, g.platform.hsize);
 
         //Platform
-        let s = g.platform.lerp_pos.s(get_time());
+        let s = g.platform.lerp_pos.s(g.elapsed_time as f64);
         let n_plat_pos = Vec2::lerp(g.platform.lerp_pos.p0, g.platform.lerp_pos.p1, s);
         let d_plat_pos = n_plat_pos - g.platform.pos;
         g.platform.pos = n_plat_pos;
         if s == 1.0 && g.frame % 500 == 0 {
             g.platform.lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + g.platform.hsize.x, hscr_w - g.platform.hsize.x), RandomRange::gen_range(-hscr_h + g.platform.hsize.y, hscr_h - g.platform.hsize.y));
             g.platform.lerp_pos.p0 = g.platform.pos;
-            g.platform.lerp_pos.t0 = get_time();
+            g.platform.lerp_pos.t0 = g.elapsed_time as f64;
         }
         
         if g.frame % 1000 == 0 {
             g.platform.lerp_size.p0 = g.platform.hsize;
             g.platform.lerp_size.p1 = g.platform.hsize * 0.75;
-            g.platform.lerp_size.t0 = get_time();
+            g.platform.lerp_size.t0 = g.elapsed_time as f64;
         }
-        let s = g.platform.lerp_size.s(get_time());
+        let s = g.platform.lerp_size.s(g.elapsed_time as f64);
         g.platform.hsize = Vec2::lerp(g.platform.lerp_size.p0, g.platform.lerp_size.p1, s);
 
         //Player:
@@ -236,20 +241,48 @@ impl Game {
 
         g.player.pos += Vec2::new(dx, dy);
         g.player.pos += d_plat_pos; //Parent player to platform
+
+        if g.frame % 1000 == 0 {
+            g.player.blank = i32::min(3, g.player.blank + 1);
+        }
+        if is_key_pressed(KeyCode::Space) && g.player.blank > 0 {
+            g.player.blank -= 1;
+            let blank = (g.player.pos, Lerp{p0:Vec2::splat(1.0), p1:Vec2::splat(100.0), t0:g.elapsed_time as f64, speed:400.0}, 1.0, WHITE);
+            g.blanks.push(blank);
+        }
         if g.player.health <= 0 {g.state = GameState::GameOver;}
+
+        // Blanks:
+        let mut blank_rem: Vec<usize> = Vec::new();
+        for (i, b) in g.blanks.iter_mut().enumerate() {
+            let s = b.1.s(g.elapsed_time as f64);
+            b.3.a = 1.0 - s; 
+            if s == 1.0 {blank_rem.push(i);}
+            b.2 = Vec2::lerp(b.1.p0, b.1.p1, s).x;
+        }
+        while blank_rem.len() > 0 {
+            g.blanks.swap_remove(blank_rem.pop().unwrap());
+        }
         
         //Player proj collision:
-        for e in g.enemies.iter_mut() {
-            let mut rem_proj: Option<usize> = None;
-            for (i, p) in e.proj.iter_mut().enumerate() {
+        let mut proj_rem: Vec<(usize, usize)> = Vec::new();
+        for (i, e) in g.enemies.iter_mut().enumerate() {
+            for (j, p) in e.proj.iter_mut().enumerate() {
                 if circle_overlap(g.player.pos, g.player.size, p.0, 3.0) {
-                    rem_proj = Some(i);
+                    proj_rem.push((i,j));
                     g.player.health -= 1;
+                    continue;
+                }
+                for b in g.blanks.iter() {
+                    if circle_overlap(b.0, b.2, p.0, 3.0) {
+                        proj_rem.push((i,j));
+                    }
                 }
             }
-            if let Some(i) = rem_proj {
-                e.proj.swap_remove(i);
-            }
+        }
+        while proj_rem.len() > 0 {
+            let rem = proj_rem.pop().unwrap();
+            g.enemies.get_mut(rem.0).unwrap().proj.swap_remove(rem.1);
         }
 
         // Enemies:
@@ -303,8 +336,14 @@ impl Game {
             }
             draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - g.player.pos, Vec2::Y), ORANGE, GOLD);
         }
+        for b in g.blanks.iter() {
+            draw_cir(pos_to_world(b.0), b.2, b.3, GRAY);
+        }
         for i in 0..g.player.health {
             draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 0.0), 10.0, GREEN, WHITE);
+        }
+        for i in 0..g.player.blank {
+            draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 20.0), 10.0, BLUE, WHITE);
         }
         draw_text(format!("{:.2}", g.elapsed_time).as_str(), 5.0, screen_height()-10.0, 20.0, WHITE);
     }
