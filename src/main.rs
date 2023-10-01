@@ -14,13 +14,15 @@ async fn main() {
     };
     let mut frames = 1;
     let mut game_over = false;
+    let mut elapsed_time = 0.0;
 
     //colors:
     let bg_col = Color::from_hex(0x141414);
-    let platform1_col = Color::from_hex(0x5a5a5a);
-    let platform2_col = Color::from_hex(0x353535);
+    let platform1_col = Color::from_hex(0x605569);
+    let platform2_col = Color::from_hex(0x3b3342);
     let p_col_1 = Color::from_hex(0x5990de);
     let p_col_2 = Color::from_hex(0x93abcd);
+    let grid_col = Color::from_hex(0x1e3821);
 
     //Player info:
     let mut p_pos = Vec2::new(hscr_w, hscr_h);
@@ -44,18 +46,21 @@ async fn main() {
     let mut lerp_plat_size_t0 = 0.0;
 
     //Enemy info:
-    //let mut enemy_pos = Vec2::new(45.0, 100.0);
-    //let mut enemy_scale = 150.0;
-    //let mut proj: Vec<(Vec2, Vec2, f32)> = Vec::new();
     let mut enemies: Vec<Enemy> = Vec::new();
     let mut e = Enemy {
         pos: Vec2::new(45.0, 100.0),
         scale: 150.0,
         proj: Vec::new(),
+        rdm: RandomRange::gen_range(0.0, 100.0),
+        rdmf: RandomRange::gen_range(1, 5),
     };
+    enemies.push(e);
 
     loop {
         clear_background(bg_col);
+        if !game_over {
+            elapsed_time += get_frame_time();
+        }
         let p_on_plat = p_on_plat(p_pos, p_size, plat_pos, plat_hsize);
 
         //update platform
@@ -104,19 +109,23 @@ async fn main() {
         }
 
         //update enemy:
-        //let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
-        //let enemy_theta = 50.0 * get_frame_time();
-        //enemy_pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (enemy_pos - plat_pos).normalize()) * enemy_scale + plat_pos;
-        //if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
-        //    proj.push((enemy_pos, -(enemy_pos - p_pos).normalize(), 200.0));
-        //}
-
+        if frames % 1100 == 0 {
+            let mut e = Enemy {
+                pos: Vec2::new(RandomRange::gen_range(-1.0, 1.0), RandomRange::gen_range(-1.0, 1.0)),
+                scale: RandomRange::gen_range(175.0, 300.0),
+                proj: Vec::new(),
+                rdm: RandomRange::gen_range(0.0, 100.0),
+                rdmf: RandomRange::gen_range(1, 5),
+            };
+            enemies.push(e);
+        }
         for e in enemies.iter_mut() {
-            let enemy_theta = get_time().sin()+ (get_time()/2.0).cos();
+            let time = get_time() + e.rdm as f64;
+            let enemy_theta = time.sin()+ (time/2.0).cos();
             e.pos = (rot_mat(enemy_theta as f32 * get_frame_time()) * (e.pos - plat_pos).normalize()) * e.scale + plat_pos;
 
-            if frames % 100 == 0 || frames % 110 == 0 || frames % 120 == 0 {
-              e.proj.push((e.pos, -(e.pos - p_pos).normalize(), 200.0));
+            if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
+              e.proj.push((e.pos, -(e.pos - p_pos).normalize(), 20.0));
             }
             for (i, p) in e.proj.iter_mut().enumerate() {
                 p.2 = p.2 + 4.0;
@@ -124,13 +133,6 @@ async fn main() {
             }
             e.proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
         }
-
-        //update proj:
-        //for (i, p) in proj.iter_mut().enumerate() {
-        //    p.2 = p.2 + 4.0;
-        //    p.0 = p.0 + (p.1 * p.2 * get_frame_time());
-        //}
-        //proj.retain(|&pos| !offscreen(pos.0)); //cull offscreen
 
         //Player proj collision:
         for e in enemies.iter_mut() {
@@ -145,39 +147,33 @@ async fn main() {
                 e.proj.swap_remove(i);
             }
         }
-        //let mut rem_proj: Option<usize> = None;
-        //for (i, p) in proj.iter().enumerate() {
-        //    if circle_overlap(p_pos, p_size, p.0, 3.0) {
-        //        rem_proj = Some(i);
-        //        p_health -= 1;
-        //    }
-        //}
-        //if let Some(i) = rem_proj {
-        //    proj.swap_remove(i);
-        //}
 
         // Draw:
+        for i in 0..(scr_h/30.0) as i32 +1 {
+            draw_line(0.0, i as f32*30.0, scr_w, i as f32 *30.0, 1.0, grid_col);
+        }
+        for i in 0..(scr_w/30.0)  as i32 +1 {
+            draw_line(i as f32*30.0, 0.0, i as f32*30.0, scr_h, 1.0, grid_col);
+        }
         draw_platform(pos_to_world(plat_pos), plat_hsize.x, plat_hsize.y, platform1_col, platform2_col);
         draw_cir(pos_to_world(p_pos), p_size, p_c_col_1, p_c_col_2);
 
         for e in enemies.iter() {
             for p in e.proj.iter() {
-                draw_cir(pos_to_world(p.0), 3.0, RED, ORANGE);    
+                draw_cir(pos_to_world(p.0), 3.0, MAROON, PINK);    
             }
-            draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - p_pos, Vec2::Y),RED, WHITE);
+            draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - p_pos, Vec2::Y), ORANGE, GOLD);
         }
-        //for p in proj.iter() {
-        //    let pos = pos_to_world(p.0);
-        //    //draw_circle(pos.x, pos.y, 4.0, RED);
-        //    draw_cir(pos, 3.0, RED, ORANGE);
-        //}
-        //draw_enemy(pos_to_world(enemy_pos), Vec2::angle_between(enemy_pos - p_pos, Vec2::Y),RED, WHITE);
         for i in 0..p_health {
             //draw_circle(20.0 + (i as f32 * 20.0), 20.0, 10.0, ORANGE);
             draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 0.0), 10.0, GREEN, WHITE);
         }
         if game_over {
             draw_text("GAME OVER", 0.0, hscr_h, 200.0, WHITE);
+            draw_text("PRESS 'R' TO RESTART", 10.0, hscr_h + 70.0, 30.0, WHITE);
+            draw_text(format!("YOU LASTED {:.2} SECONDS", elapsed_time).as_str(), 10.0, hscr_h + 40.0, 50.0, WHITE);
+        } else {
+            draw_text(format!("{:.2}", elapsed_time).as_str(), 5.0, screen_height()-10.0, 20.0, WHITE);
         }
 
         frames += 1;
@@ -235,4 +231,6 @@ struct Enemy {
     pos: Vec2,
     scale: f32,
     proj: Vec<(Vec2, Vec2, f32)>,
+    rdm: f32,
+    rdmf: i32,
 }
