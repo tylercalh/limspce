@@ -1,4 +1,4 @@
-use macroquad::{prelude::*, color, rand::RandomRange};
+use macroquad::{prelude::*, rand::RandomRange};
 
 #[macroquad::main("limspce")]
 async fn main() {
@@ -23,16 +23,11 @@ async fn main() {
     let p_col_1 = Color::from_hex(0x5990de);
     let p_col_2 = Color::from_hex(0x93abcd);
     let grid_col = Color::from_hex(0x1e3821);
-
-    //Player info:
-    // let mut p_pos = Vec2::new(hscr_w, hscr_h);
-    // p_pos = world_to_pos(p_pos);
-    // let mut p_size = 7.0;
-    // let p_speed = 150.0;
+    // Should these belong to player?
     let mut p_c_col_1 = p_col_1;
     let mut p_c_col_2 = p_col_2;
-    //let mut p_health = 3;
-
+    
+    // Player:
     let mut player = Player {
         pos: Vec2::new(0.0, 0.0),
         size: 7.0,
@@ -40,20 +35,27 @@ async fn main() {
         health: 3,
     };
 
-    //Map info:
+    //Map:
     let mut plat_pos = Vec2::new(hscr_w, hscr_h);
     plat_pos = world_to_pos(plat_pos);
     let mut plat_hsize = Vec2::new(200.0, 200.0);
-    let mut lerp_plat_pos_p0 = plat_pos;
-    let mut lerp_plat_pos_p1 = Vec2::new(0.0, 70.0);
-    let mut lerp_plat_pos_t0 = 0.0;
-    let mut lerp_plat_size_p0 = plat_hsize;
-    let mut lerp_plat_size_p1 = plat_hsize;
-    let mut lerp_plat_size_t0 = 0.0;
+    
+    let mut lerp_pos = Lerp {
+        p0: plat_pos,
+        p1: Vec2::new(0.0, 70.0),
+        t0: 0.0,
+        speed: 20.0,
+    };
+    let mut lerp_size = Lerp {
+        p0: plat_hsize,
+        p1: plat_hsize,
+        t0: 0.0,
+        speed: 20.0,
+    };
 
-    //Enemy info:
+    //Enemy:
     let mut enemies: Vec<Enemy> = Vec::new();
-    let mut e = Enemy {
+    let e = Enemy {
         pos: Vec2::new(45.0, 100.0),
         scale: 150.0,
         proj: Vec::new(),
@@ -69,27 +71,26 @@ async fn main() {
         }
         let p_on_plat = p_on_plat(player.pos, player.size, plat_pos, plat_hsize);
 
-        //update platform
-        let s = get_s(lerp_plat_pos_p0, lerp_plat_pos_p1, get_time(), lerp_plat_pos_t0, 20.0);
-        let n_plat_pos = Vec2::lerp(lerp_plat_pos_p0, lerp_plat_pos_p1, s);
+        //Update platform:
+        let s = lerp_pos.s(get_time());
+        let n_plat_pos = Vec2::lerp(lerp_pos.p0, lerp_pos.p1, s);
         let d_plat_pos = n_plat_pos - plat_pos;
         plat_pos = n_plat_pos;
         if s == 1.0 && frames % 500 == 0 {
-            lerp_plat_pos_p1 = Vec2::new(RandomRange::gen_range(-hscr_w + plat_hsize.x, hscr_w - plat_hsize.x), RandomRange::gen_range(-hscr_h + plat_hsize.y, hscr_h - plat_hsize.y));
-            lerp_plat_pos_p0 = plat_pos;
-            lerp_plat_pos_t0 = get_time();
+            lerp_pos.p1 = Vec2::new(RandomRange::gen_range(-hscr_w + plat_hsize.x, hscr_w - plat_hsize.x), RandomRange::gen_range(-hscr_h + plat_hsize.y, hscr_h - plat_hsize.y));
+            lerp_pos.p0 = plat_pos;
+            lerp_pos.t0 = get_time();
         }
         
         if frames % 1000 == 0 {
-            lerp_plat_size_p0 = plat_hsize;
-            lerp_plat_size_p1 = plat_hsize * 0.75;
-            lerp_plat_size_t0 = get_time();
+            lerp_size.p0 = plat_hsize;
+            lerp_size.p1 = plat_hsize * 0.75;
+            lerp_size.t0 = get_time();
         }
-        let s = get_s(lerp_plat_size_p0, lerp_plat_size_p1, get_time(), lerp_plat_size_t0, 20.0);
-        plat_hsize = Vec2::lerp(lerp_plat_size_p0, lerp_plat_size_p1, s);
+        let s = lerp_size.s(get_time());
+        plat_hsize = Vec2::lerp(lerp_size.p0, lerp_size.p1, s);
 
-
-        //update player:
+        //Update player:
         if p_on_plat && !game_over {
             let mut dx = 0.0;
             let mut dy = 0.0;
@@ -114,9 +115,9 @@ async fn main() {
             game_over = true;
         }
 
-        //update enemy:
+        //Update enemy:
         if frames % 1100 == 0 {
-            let mut e = Enemy {
+            let e = Enemy {
                 pos: Vec2::new(RandomRange::gen_range(-1.0, 1.0), RandomRange::gen_range(-1.0, 1.0)),
                 scale: RandomRange::gen_range(175.0, 300.0),
                 proj: Vec::new(),
@@ -133,7 +134,7 @@ async fn main() {
             if frames % (100 + e.rdmf) == 0 || frames % (110 + e.rdmf) == 0 || frames % (120 + e.rdmf) == 0 {
               e.proj.push((e.pos, -(e.pos - player.pos).normalize(), 20.0));
             }
-            for (i, p) in e.proj.iter_mut().enumerate() {
+            for p in e.proj.iter_mut() {
                 p.2 = p.2 + 4.0;
                 p.0 = p.0 + (p.1 * p.2 * get_frame_time());
             }
@@ -157,10 +158,10 @@ async fn main() {
         // Draw:
         for i in 0..(scr_h/30.0) as i32 +1 {
             draw_line(0.0, i as f32*30.0, scr_w, i as f32 *30.0, 1.0, grid_col);
-        }
+        } // Grid
         for i in 0..(scr_w/30.0)  as i32 +1 {
             draw_line(i as f32*30.0, 0.0, i as f32*30.0, scr_h, 1.0, grid_col);
-        }
+        } // Grid
         draw_platform(pos_to_world(plat_pos), plat_hsize.x, plat_hsize.y, platform1_col, platform2_col);
         draw_cir(pos_to_world(player.pos), player.size, p_c_col_1, p_c_col_2);
 
@@ -169,11 +170,10 @@ async fn main() {
                 draw_cir(pos_to_world(p.0), 3.0, MAROON, PINK);    
             }
             draw_enemy(pos_to_world(e.pos), Vec2::angle_between(e.pos - player.pos, Vec2::Y), ORANGE, GOLD);
-        }
+        } // Enemies, Projectiles
         for i in 0..player.health {
-            //draw_circle(20.0 + (i as f32 * 20.0), 20.0, 10.0, ORANGE);
             draw_cir(Vec2::splat(20.0) + Vec2::new(i as f32 * 20.0, 0.0), 10.0, GREEN, WHITE);
-        }
+        } // Player health
         if game_over {
             draw_text("GAME OVER", 0.0, hscr_h, 200.0, WHITE);
             draw_text("PRESS 'R' TO RESTART", 10.0, hscr_h + 70.0, 30.0, WHITE);
@@ -217,13 +217,6 @@ fn draw_cir(pos: Vec2, r: f32, color_a: Color, color_b: Color) {
     draw_circle(pos.x, pos.y, r, color_a);
     draw_circle_lines(pos.x, pos.y, r+1.0, 2.0, color_b);
 }
-fn get_s(p0: Vec2, p1: Vec2, current_time: f64, t0: f64, speed: f32) -> f32 {
-    let current_time = current_time as f32;
-    let t0 = t0 as f32;
-    let ratio = (current_time - t0) / Vec2::distance(p0, p1);
-    let ratio = ratio * speed;
-    f32::min(ratio, 1.0)
-}
 fn rot_mat(theta: f32) -> Mat2 {
     Mat2 {
         x_axis: Vec2::new(theta.cos(), -theta.sin()),
@@ -246,4 +239,21 @@ struct Enemy {
     proj: Vec<(Vec2, Vec2, f32)>,
     rdm: f32,
     rdmf: i32,
+}
+
+struct Lerp {
+    p0: Vec2,
+    p1: Vec2,
+    t0: f64,
+    speed: f32,
+}
+
+impl Lerp {
+    fn s(&self, current_time: f64) -> f32 {
+        let current_time = current_time as f32;
+        let start_time = self.t0 as f32;
+        let ratio = (current_time - start_time) / Vec2::distance(self.p0, self.p1);
+        let ratio = ratio * self.speed;
+        f32::min(ratio, 1.0)
+    }
 }
