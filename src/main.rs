@@ -16,6 +16,9 @@ async fn main() {
                 Game::draw(&g);
                 if is_key_pressed(KeyCode::Escape) {g.state = GameState::Pause;}
                 g.elapsed_time += get_frame_time();
+                draw_text("PRESS 'ESC' TO PAUSE", 5.0, screen_height()-25.0, 20.0, WHITE);
+                draw_text("PRESS 'SPC' TO BLANK", 5.0, screen_height()-40.0, 20.0, WHITE);
+                draw_text("USE 'WASD' TO MOVE", 5.0, screen_height()-55.0, 20.0, WHITE);
             },
             GameState::Pause => {
                 Game::draw(&g);
